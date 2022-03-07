@@ -1,7 +1,7 @@
-import { useMyHook } from './'
+import { useFirebaseAuth } from './'
 
-describe('useMyHook', () => {
+describe('useFirebaseAuth', () => {
   it('is truthy', () => {
-    expect(useMyHook).toBeTruthy()
+    expect(useFirebaseAuth).toBeTruthy()
   })
 })

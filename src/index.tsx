@@ -2,20 +2,47 @@ import React, {
   createContext,
   ReactNode,
   Dispatch,
-  SetStateAction,
   useEffect,
   useContext,
 } from "react"
-import firebaseNs, { FirebaseError } from "firebase/app"
+import { FirebaseApp, FirebaseError } from "firebase/app"
+import {
+  // Functions
+  applyActionCode as firebaseApplyActionCode,
+  createUserWithEmailAndPassword as firebaseCreateUserWithEmailAndPassword,
+  confirmPasswordReset as firebaseConfirmPasswordReset,
+  fetchSignInMethodsForEmail,
+  getAuth,
+  linkWithCredential,
+  onAuthStateChanged,
+  sendPasswordResetEmail as firebaseSendPasswordResetEmail,
+  signInWithPopup,
+  signInWithEmailAndPassword as firebaseSignInWithEmailAndPassword,
+  signOut as firebaseSignOut,
+  updatePassword as firebaseUpdatePassword,
+  updateProfile as firebaseUpdateProfile,
+  useDeviceLanguage,
+  verifyPasswordResetCode as firebaseVerifyPasswordResetCode,
+  // Classes
+  FacebookAuthProvider,
+  GithubAuthProvider,
+  GoogleAuthProvider,
+  OAuthProvider,
+  TwitterAuthProvider,
+  // Interfaces
+  AuthProvider,
+  User,
+  UserCredential,
+} from "firebase/auth"
 import { useReducedState } from "./use-reduced-state"
 
 interface FirebaseContext {
-  user?: firebaseNs.User
-  loading: boolean
+  user?: User
+  loading: boolean | undefined
   error?: FirebaseError
-  firebase: typeof firebaseNs
-  setState: Dispatch<SetStateAction<FirebaseAuthState>>
-  firstCheck: boolean
+  firebase: FirebaseApp
+  setState: Dispatch<FirebaseAuthState>
+  firstCheck: boolean | undefined
 }
 const FirebaseContext = createContext<FirebaseContext | null>(null)
 
@@ -30,7 +57,7 @@ export enum SIGNIN_PROVIDERS {
 }
 
 interface FirebaseAuthState {
-  user?: firebaseNs.User
+  user?: User
   loading?: boolean
   error?: FirebaseError
   firstCheck?: boolean
@@ -40,10 +67,11 @@ export function FirebaseAuthProvider({
   firebase,
   children,
 }: {
-  firebase: typeof firebaseNs
+  firebase: FirebaseApp
   children: ReactNode
 }): JSX.Element {
-  const firebaseCurrentUser = firebase.auth().currentUser
+  const auth = getAuth()
+  const firebaseCurrentUser = auth.currentUser
   const [{ user, loading, error, firstCheck }, setState] = useReducedState({
     user: firebaseCurrentUser === null ? undefined : firebaseCurrentUser,
     loading: false,
@@ -52,9 +80,7 @@ export function FirebaseAuthProvider({
 
   useEffect(() => {
     !user && setState({ loading: true })
-    return firebase
-      .auth()
-      .onAuthStateChanged(function(user: firebaseNs.User | null) {
+    return onAuthStateChanged(auth, function(user: User | null) {
         setState({
           loading: false,
           user: user === null ? undefined : user,
@@ -91,44 +117,42 @@ export function useFirebaseAuth() {
     loading,
     error,
     setState,
-    firebase,
     firstCheck,
   } = firebaseContext
 
   async function signInWithProvider(
-    provider: string | firebaseNs.auth.AuthProvider,
+    provider: string | AuthProvider,
     options?: { scopes?: string[] },
-  ): Promise<firebaseNs.auth.UserCredential | null> {
+  ): Promise<UserCredential | null> {
+    const auth = getAuth()
     setState({ loading: true })
-    firebase.auth().useDeviceLanguage()
+    useDeviceLanguage(auth)
 
-    const auth: typeof firebaseNs.auth = (firebase.auth as unknown) as typeof firebaseNs.auth
-
-    let providerObj: firebaseNs.auth.AuthProvider
+    let providerObj: AuthProvider
     if (typeof provider === "string") {
       switch (provider) {
         case SIGNIN_PROVIDERS.GOOGLE:
-          providerObj = new auth.GoogleAuthProvider()
+          providerObj = new GoogleAuthProvider()
           break
 
         case SIGNIN_PROVIDERS.FACEBOOK:
-          providerObj = new auth.FacebookAuthProvider()
+          providerObj = new FacebookAuthProvider()
           break
 
         case SIGNIN_PROVIDERS.TWITTER:
-          providerObj = new auth.TwitterAuthProvider()
+          providerObj = new TwitterAuthProvider()
           break
 
         case SIGNIN_PROVIDERS.GITHUB:
-          providerObj = new auth.GithubAuthProvider()
+          providerObj = new GithubAuthProvider()
           break
 
         case SIGNIN_PROVIDERS.MICROSOFT:
-          providerObj = new auth.OAuthProvider("microsoft.com")
+          providerObj = new OAuthProvider("microsoft.com")
           break
 
         case SIGNIN_PROVIDERS.YAHOO:
-          providerObj = new auth.OAuthProvider("yahoo.com")
+          providerObj = new OAuthProvider("yahoo.com")
           break
 
         default:
@@ -141,44 +165,39 @@ export function useFirebaseAuth() {
     const scopes: string[] =
       options && Array.isArray(options.scopes) ? options.scopes : []
 
-    if (provider instanceof firebase.auth.OAuthProvider) {
+    if (provider instanceof OAuthProvider) {
       scopes.forEach(scope =>
-        (providerObj as firebaseNs.auth.OAuthProvider).addScope(scope),
+        (providerObj as OAuthProvider).addScope(scope),
       )
     }
 
     try {
-      const userCredential = await firebase.auth().signInWithPopup(providerObj)
+      const userCredential = await signInWithPopup(auth, providerObj)
       return userCredential
-    } catch (e) {
-      if (
-        e.email &&
-        e.credential &&
-        e.code === "auth/account-exists-with-different-credential"
-      ) {
+    } catch (e: any | undefined) {
+      // eslint-disable-next-line
+      if ( e.email && e.credential && e.code === "auth/account-exists-with-different-credential") {
         const supportedPopupSignInMethods = [
-          firebase.auth.GoogleAuthProvider.PROVIDER_ID,
-          firebase.auth.FacebookAuthProvider.PROVIDER_ID,
-          firebase.auth.GithubAuthProvider.PROVIDER_ID,
+          GoogleAuthProvider.PROVIDER_ID as string,
+          FacebookAuthProvider.PROVIDER_ID as string,
+          GithubAuthProvider.PROVIDER_ID as string,
         ]
 
         const getProvider = (providerId: string) => {
           switch (providerId) {
-            case firebase.auth.GoogleAuthProvider.PROVIDER_ID:
-              return new firebase.auth.GoogleAuthProvider()
-            case firebase.auth.FacebookAuthProvider.PROVIDER_ID:
-              return new firebase.auth.FacebookAuthProvider()
-            case firebase.auth.GithubAuthProvider.PROVIDER_ID:
-              return new firebase.auth.GithubAuthProvider()
+            case GoogleAuthProvider.PROVIDER_ID:
+              return new GoogleAuthProvider()
+            case FacebookAuthProvider.PROVIDER_ID:
+              return new FacebookAuthProvider()
+            case GithubAuthProvider.PROVIDER_ID:
+              return new GithubAuthProvider()
             default:
               throw new Error(`No provider implemented for ${providerId}`)
           }
         }
 
-        const providers = await firebase
-          .auth()
-          .fetchSignInMethodsForEmail(e.email)
-        const firstPopupProviderMethod = providers.find(p =>
+        const providers = await fetchSignInMethodsForEmail(auth, e.email)
+        const firstPopupProviderMethod = providers.find((p) =>
           supportedPopupSignInMethods.includes(p),
         )
 
@@ -192,8 +211,8 @@ export function useFirebaseAuth() {
         const linkedProvider = getProvider(firstPopupProviderMethod)
         linkedProvider.setCustomParameters({ login_hint: e.email })
 
-        const result = await firebase.auth().signInWithPopup(linkedProvider)
-        result.user && result.user.linkWithCredential(e.credential)
+        const result = await signInWithPopup(auth, linkedProvider)
+        result.user && linkWithCredential(result.user, e.credential)
       } else {
         setState({
           error: e,
@@ -207,12 +226,11 @@ export function useFirebaseAuth() {
   async function signInWithEmailAndPassword(
     email: string,
     password: string,
-  ): Promise<void | firebaseNs.auth.UserCredential> {
+  ): Promise<void | UserCredential> {
+    const auth = getAuth()
     setState({ loading: true })
 
-    return firebase
-      .auth()
-      .signInWithEmailAndPassword(email, password)
+    return firebaseSignInWithEmailAndPassword(auth, email, password)
       .catch((e: FirebaseError) => {
         setState({
           error: e,
@@ -222,18 +240,18 @@ export function useFirebaseAuth() {
   }
 
   async function signOut(): Promise<void> {
+    const auth = getAuth()
     setState({ loading: true })
-    return firebase.auth().signOut()
+    return firebaseSignOut(auth)
   }
 
   async function createUserWithEmailAndPassword(
     email: string,
     password: string,
-  ): Promise<void | firebaseNs.auth.UserCredential> {
+  ): Promise<void | UserCredential> {
+    const auth = getAuth()
     setState({ loading: true })
-    return firebase
-      .auth()
-      .createUserWithEmailAndPassword(email, password)
+    return firebaseCreateUserWithEmailAndPassword(auth, email, password)
       .catch((e: FirebaseError) => {
         setState({
           error: e,
@@ -243,22 +261,26 @@ export function useFirebaseAuth() {
   }
 
   async function sendPasswordResetEmail(email: string): Promise<void> {
-    return firebase.auth().sendPasswordResetEmail(email)
+    const auth = getAuth()
+    return firebaseSendPasswordResetEmail(auth, email)
   }
 
   async function verifyPasswordResetCode(code: string): Promise<string> {
-    return firebase.auth().verifyPasswordResetCode(code)
+    const auth = getAuth()
+    return firebaseVerifyPasswordResetCode(auth, code)
   }
 
   async function confirmPasswordReset(
     code: string,
     newPassword: string,
   ): Promise<void> {
-    return firebase.auth().confirmPasswordReset(code, newPassword)
+    const auth = getAuth()
+    return firebaseConfirmPasswordReset(auth, code, newPassword)
   }
 
   async function applyActionCode(code: string): Promise<void> {
-    return firebase.auth().applyActionCode(code)
+    const auth = getAuth()
+    return firebaseApplyActionCode(auth, code)
   }
 
   async function updateProfile({
@@ -271,7 +293,7 @@ export function useFirebaseAuth() {
     if (!user) {
       throw new Error("User is not logged in")
     }
-    return user.updateProfile({
+    return firebaseUpdateProfile(user, {
       displayName,
       photoURL,
     })
@@ -282,7 +304,7 @@ export function useFirebaseAuth() {
       throw new Error("User is not logged in")
     }
 
-    return user.updatePassword(newPassword)
+    return firebaseUpdatePassword(user, newPassword)
   }
 
   return {
