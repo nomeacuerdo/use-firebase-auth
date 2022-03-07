@@ -64,15 +64,13 @@ interface FirebaseAuthState {
 }
 
 export function FirebaseAuthProvider({
-  initializeApp,
-  firebaseConfig,
+  app,
   children,
 }: {
-  initializeApp: Function
+  app: FirebaseApp
   firebaseConfig: FirebaseOptions
   children: ReactNode
 }): JSX.Element {
-  const app = initializeApp(firebaseConfig);
   const auth = getAuth(app);
   const firebaseCurrentUser = auth.currentUser
   const [{ user, loading, error, firstCheck }, setState] = useReducedState({
