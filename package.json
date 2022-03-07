@@ -22,7 +22,6 @@
     "deploy": "gh-pages -d example/build"
   },
   "peerDependencies": {
-    "firebase": "^7.5.0",
     "react": "^16.8.6"
   },
   "devDependencies": {
@@ -36,6 +35,7 @@
     "eslint-config-prettier": "^4.1.0",
     "eslint-plugin-prettier": "^3.0.1",
     "eslint-plugin-react": "^7.12.4",
+    "firebase": "^7.5.0",
     "gh-pages": "^2.0.1",
     "prettier": "^1.16.4",
     "react": "^16.8.6",
