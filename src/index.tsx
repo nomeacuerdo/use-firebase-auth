@@ -5,7 +5,7 @@ import React, {
   useEffect,
   useContext,
 } from "react";
-import { FirebaseOptions, FirebaseError } from "firebase/app";
+import { FirebaseOptions, FirebaseError, FirebaseApp } from "firebase/app";
 import {
   // Functions
   applyActionCode as firebaseApplyActionCode,
@@ -40,8 +40,7 @@ interface FirebaseContext {
   user?: User
   loading: boolean | undefined
   error?: FirebaseError
-  initializeApp: Function
-  firebaseConfig: FirebaseOptions
+  app: FirebaseApp
   setState: Dispatch<FirebaseAuthState>
   firstCheck: boolean | undefined
 }
@@ -73,7 +72,8 @@ export function FirebaseAuthProvider({
   firebaseConfig: FirebaseOptions
   children: ReactNode
 }): JSX.Element {
-  const auth = getAuth()
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
   const firebaseCurrentUser = auth.currentUser
   const [{ user, loading, error, firstCheck }, setState] = useReducedState({
     user: firebaseCurrentUser === null ? undefined : firebaseCurrentUser,
@@ -98,8 +98,7 @@ export function FirebaseAuthProvider({
         user,
         loading,
         error,
-        initializeApp,
-        firebaseConfig,
+        app,
         setState,
         firstCheck,
       }}
@@ -120,19 +119,16 @@ export function useFirebaseAuth() {
     user,
     loading,
     error,
+    app,
     setState,
-    initializeApp,
-    firebaseConfig,
     firstCheck,
   } = firebaseContext;
-
-  initializeApp(firebaseConfig);
 
   async function signInWithProvider(
     provider: string | AuthProvider,
     options?: { scopes?: string[] },
   ): Promise<UserCredential | null> {
-    const auth = getAuth()
+    const auth = getAuth(app)
     setState({ loading: true })
     useDeviceLanguage(auth)
 
@@ -235,7 +231,7 @@ export function useFirebaseAuth() {
     email: string,
     password: string,
   ): Promise<void | UserCredential> {
-    const auth = getAuth()
+    const auth = getAuth(app)
     setState({ loading: true })
 
     return firebaseSignInWithEmailAndPassword(auth, email, password)
@@ -248,7 +244,7 @@ export function useFirebaseAuth() {
   }
 
   async function signOut(): Promise<void> {
-    const auth = getAuth()
+    const auth = getAuth(app)
     setState({ loading: true })
     return firebaseSignOut(auth)
   }
@@ -257,7 +253,7 @@ export function useFirebaseAuth() {
     email: string,
     password: string,
   ): Promise<void | UserCredential> {
-    const auth = getAuth()
+    const auth = getAuth(app)
     setState({ loading: true })
     return firebaseCreateUserWithEmailAndPassword(auth, email, password)
       .catch((e: FirebaseError) => {
@@ -269,12 +265,12 @@ export function useFirebaseAuth() {
   }
 
   async function sendPasswordResetEmail(email: string): Promise<void> {
-    const auth = getAuth()
+    const auth = getAuth(app)
     return firebaseSendPasswordResetEmail(auth, email)
   }
 
   async function verifyPasswordResetCode(code: string): Promise<string> {
-    const auth = getAuth()
+    const auth = getAuth(app)
     return firebaseVerifyPasswordResetCode(auth, code)
   }
 
@@ -282,12 +278,12 @@ export function useFirebaseAuth() {
     code: string,
     newPassword: string,
   ): Promise<void> {
-    const auth = getAuth()
+    const auth = getAuth(app)
     return firebaseConfirmPasswordReset(auth, code, newPassword)
   }
 
   async function applyActionCode(code: string): Promise<void> {
-    const auth = getAuth()
+    const auth = getAuth(app)
     return firebaseApplyActionCode(auth, code)
   }
 
