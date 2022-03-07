@@ -4,8 +4,8 @@ import React, {
   Dispatch,
   useEffect,
   useContext,
-} from "react"
-import { FirebaseApp, FirebaseError } from "firebase/app"
+} from "react";
+import { FirebaseOptions, FirebaseError } from "firebase/app";
 import {
   // Functions
   applyActionCode as firebaseApplyActionCode,
@@ -33,14 +33,15 @@ import {
   AuthProvider,
   User,
   UserCredential,
-} from "firebase/auth"
-import { useReducedState } from "./use-reduced-state"
+} from "firebase/auth";
+import { useReducedState } from "./use-reduced-state";
 
 interface FirebaseContext {
   user?: User
   loading: boolean | undefined
   error?: FirebaseError
-  firebase: FirebaseApp
+  initializeApp: Function
+  firebaseConfig: FirebaseOptions
   setState: Dispatch<FirebaseAuthState>
   firstCheck: boolean | undefined
 }
@@ -64,10 +65,12 @@ interface FirebaseAuthState {
 }
 
 export function FirebaseAuthProvider({
-  firebase,
+  initializeApp,
+  firebaseConfig,
   children,
 }: {
-  firebase: FirebaseApp
+  initializeApp: Function
+  firebaseConfig: FirebaseOptions
   children: ReactNode
 }): JSX.Element {
   const auth = getAuth()
@@ -95,7 +98,8 @@ export function FirebaseAuthProvider({
         user,
         loading,
         error,
-        firebase,
+        initializeApp,
+        firebaseConfig,
         setState,
         firstCheck,
       }}
@@ -117,8 +121,12 @@ export function useFirebaseAuth() {
     loading,
     error,
     setState,
+    initializeApp,
+    firebaseConfig,
     firstCheck,
-  } = firebaseContext
+  } = firebaseContext;
+
+  initializeApp(firebaseConfig);
 
   async function signInWithProvider(
     provider: string | AuthProvider,
